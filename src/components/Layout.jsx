@@ -1,7 +1,9 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/icon-512.png";
-import { getStoredOrders } from "../lib/ordersStore";
 import { getActiveStaffUser, setActiveStaffUser } from "../lib/staffUsersStore";
+
+const APP_NAME = "Retail Ops";
+const STAFF_TAGLINE = "Manage counter sales, products, customers, invoices, and sales history";
 
 function FacebookIcon() {
   return (
@@ -31,65 +33,22 @@ function InstagramIcon() {
   );
 }
 
-function normalizeStatus(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function isDueSoon(dateValue) {
-  if (!dateValue) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const dueDate = new Date(`${dateValue}T00:00:00`);
-  const fiveDaysFromNow = new Date(today);
-  fiveDaysFromNow.setDate(today.getDate() + 5);
-
-  return dueDate >= today && dueDate <= fiveDaysFromNow;
-}
-
-function getSidebarCounts() {
-  const orders = getStoredOrders();
-
-  const needsAttention = orders.filter((order) =>
-    ["quote sent", "mockup sent", "awaiting approval", "awaiting customer approval", "approved", "awaiting deposit"].includes(normalizeStatus(order.status)) && order.deposit?.status !== "paid"
-  ).length;
-
-  const productionReady = orders.filter((order) =>
-    ["approved", "paid", "deposit paid", "ready for production", "in production", "printing", "embroidery", "production"].includes(normalizeStatus(order.status)) || order.production_ready
-  ).length;
-
-  const dueSoon = orders.filter((order) =>
-    isDueSoon(order.due_date) && !["completed", "cancelled"].includes(normalizeStatus(order.status))
-  ).length;
-
-  return {
-    productionOrders: needsAttention + dueSoon,
-    productionQueue: productionReady,
-  };
-}
-
 function getAdminSections(role) {
   const isOwner = role === "Owner";
 
   return [
     {
       title: "Counter",
-      links: [{ to: "/admin/sales/new", label: "New Quick Sale" }],
-    },
-    {
-      title: "Production",
       links: [
-        { to: "/admin/orders/new", label: "New Production Order" },
-        { to: "/admin/orders", label: "Production Orders", badgeKey: "productionOrders" },
-        { to: "/admin/queue", label: "Production Queue", badgeKey: "productionQueue" },
+        { to: "/admin/sales/new", label: "Counter Sale" },
+        { to: "/admin/sales", label: "Sales History" },
       ],
     },
     {
       title: "Records",
       links: [
-        { to: "/admin/sales", label: "Sales History" },
+        ...(isOwner ? [{ to: "/admin/products", label: "Products / Inventory" }] : []),
         { to: "/admin/customers", label: "Customers" },
-        ...(isOwner ? [{ to: "/admin/products", label: "Products" }] : []),
         ...(isOwner ? [{ to: "/admin/staff-users", label: "Staff Users" }] : []),
       ],
     },
@@ -100,9 +59,6 @@ function getActiveSidebarLink(pathname) {
   if (pathname === "/admin") return "/admin";
   if (pathname === "/admin/sales/new") return "/admin/sales/new";
   if (pathname === "/admin/sales") return "/admin/sales";
-  if (pathname === "/admin/orders/new") return "/admin/orders/new";
-  if (pathname === "/admin/orders" || pathname.startsWith("/admin/orders/")) return "/admin/orders";
-  if (pathname === "/admin/queue") return "/admin/queue";
   if (pathname.startsWith("/admin/customers")) return "/admin/customers";
   if (pathname.startsWith("/admin/products")) return "/admin/products";
   if (pathname.startsWith("/admin/staff-users")) return "/admin/staff-users";
@@ -193,33 +149,7 @@ function SwitchStaffButton({ isAdmin }) {
   );
 }
 
-function AttentionBadge({ count, active }) {
-  if (!count) return null;
-
-  return (
-    <span
-      style={{
-        minWidth: "22px",
-        height: "22px",
-        padding: "0 7px",
-        borderRadius: "999px",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: active ? "#ffffff" : "#fff7ed",
-        color: active ? "#171717" : "#c2410c",
-        border: active ? "none" : "1px solid #fed7aa",
-        fontSize: "12px",
-        fontWeight: 900,
-      }}
-    >
-      {count}
-    </span>
-  );
-}
-
 function AdminSidebar({ pathname, staffUser }) {
-  const badgeCounts = getSidebarCounts();
   const activeLink = getActiveSidebarLink(pathname);
   const role = staffUser?.role || "Staff";
   const adminSections = getAdminSections(role);
@@ -272,7 +202,6 @@ function AdminSidebar({ pathname, staffUser }) {
           <div style={{ display: "grid", gap: "6px" }}>
             {section.links.map((link) => {
               const active = activeLink === link.to;
-              const badgeCount = link.badgeKey ? badgeCounts[link.badgeKey] : 0;
               return (
                 <Link
                   key={link.to}
@@ -293,7 +222,6 @@ function AdminSidebar({ pathname, staffUser }) {
                   }}
                 >
                   <span>{link.label}</span>
-                  <AttentionBadge count={badgeCount} active={active} />
                 </Link>
               );
             })}
@@ -366,9 +294,9 @@ export default function Layout() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <img src={logo} alt="Tee & Co Ltd." style={{ height: "80px", objectFit: "contain" }} />
+            <img src={logo} alt={APP_NAME} style={{ height: "80px", objectFit: "contain" }} />
             <span style={{ fontWeight: 700, fontSize: "22px", letterSpacing: "-0.02em", color: "#171717" }}>
-              Tee & Co Ltd.
+              {APP_NAME}
             </span>
             <WorkspaceBadge isAdmin={isAdmin} />
             {isAdmin && <ActiveStaffBadge staffUser={activeStaffUser} />}
@@ -428,7 +356,7 @@ export default function Layout() {
             {isAdmin ? "Staff Workspace" : "Customer Portal"}
           </p>
           <h1 style={{ margin: "2px 0", fontSize: "16px", lineHeight: 1.2, letterSpacing: "-0.02em" }}>
-            {isAdmin ? "Manage counter sales, production orders, and customer records" : "Custom apparel ordering made simple"}
+            {isAdmin ? STAFF_TAGLINE : "Local store catalog and service information"}
           </h1>
         </div>
       </div>
